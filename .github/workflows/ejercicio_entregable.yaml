@@ -1,0 +1,97 @@
+name: Ejercicio Entregable - Ventas
+
+on:
+  workflow_dispatch:
+    inputs:
+      tests_seguridad:
+        description: '¿Quieres ejecutar los Tests de Seguridad?'
+        required: true
+        type: choice
+        options:
+          - 'sí'
+          - 'no'
+        default: 'no'
+
+jobs:
+  ci_seguridad:
+    name: CI y Seguridad
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Validar que ventas.json es un JSON válido
+        run: python3 -m json.tool ventas.json > /dev/null
+
+      - name: Confirmar validación del JSON
+        run: echo "ventas.json contiene un JSON válido."
+
+      - name: Preparar Python
+        if: ${{ inputs.tests_seguridad == 'sí' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Ejecutar Tests de Seguridad
+        if: ${{ inputs.tests_seguridad == 'sí' }}
+        run: python3 scripts/scan_security.py
+
+  procesamiento:
+    name: Procesamiento - ${{ matrix.entorno }}
+    needs: ci_seguridad
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        entorno: [staging, production]
+    steps:
+      - name: Descargar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Procesar ventas y generar reporte
+        env:
+          ENTORNO: ${{ matrix.entorno }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+
+          entorno = os.environ["ENTORNO"]
+          with open("ventas.json", "r", encoding="utf-8") as archivo:
+              ventas = json.load(archivo)
+
+          total_ventas = sum(float(venta["importe"]) for venta in ventas["ventas"])
+          numero_ventas = len(ventas["ventas"])
+
+          nombre_reporte = f"reporte-{entorno}.txt"
+          with open(nombre_reporte, "w", encoding="utf-8") as reporte:
+              reporte.write(f"REPORTE DE VENTAS - {entorno.upper()}\\n")
+              reporte.write(f"Fecha de ejecución: {datetime.now(timezone.utc).isoformat()}\\n")
+              reporte.write(f"Número de ventas: {numero_ventas}\\n")
+              reporte.write(f"Importe total: {total_ventas:.2f} EUR\\n")
+
+          print(f"Reporte generado: {nombre_reporte}")
+          PY
+
+      - name: Subir reporte como artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: reporte-${{ matrix.entorno }}
+          path: reporte-${{ matrix.entorno }}.txt
+          if-no-files-found: error
+
+  notificacion_exito:
+    name: Notificación de Éxito
+    needs: [ci_seguridad, procesamiento]
+    runs-on: ubuntu-latest
+    if: ${{ success() }}
+    steps:
+      - name: Simular notificación a Discord
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK" ]; then
+            echo "ERROR: configura el secreto DISCORD_WEBHOOK en Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          echo "Notificación enviada al webhook de Discord: $DISCORD_WEBHOOK"
