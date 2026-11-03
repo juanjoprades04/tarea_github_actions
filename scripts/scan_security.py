@@ -3,7 +3,7 @@ from pathlib import Path
 import re
 import sys
 
-# Patrones orientativos para detectar asignaciones que podrían contener secretos.
+# Patrones orientativos para detectar asignaciones que podrian contener secretos.
 PATRONES = [
     re.compile(r"""(?i)(api[_-]?key|secret[_-]?key|access[_-]?token)\s*[:=]\s*["'][^"']{8,}["']"""),
     re.compile(r"""(?i)AKIA[0-9A-Z]{16}"""),  # Identificador típico de AWS

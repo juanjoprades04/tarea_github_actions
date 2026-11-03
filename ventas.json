@@ -2,12 +2,12 @@
   "ventas": [
     {
       "id": 1,
-      "producto": "Portátil",
+      "producto": "Portatil",
       "importe": 899.99
     },
     {
       "id": 2,
-      "producto": "Ratón",
+      "producto": "Raton",
       "importe": 24.5
     },
     {
